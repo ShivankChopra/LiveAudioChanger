@@ -1,0 +1,31 @@
+<html>
+    <head>
+        <title>Live Streaming Voice Changer</title>
+    </head>
+
+    <body>
+        Live Streaming Voice Changer
+        <div id="root" />
+        <audio autoplay></audio>
+        <script>
+            let root = document.getElementById('root');
+            //let audio = document.querySelector('audio');
+            let ws = new WebSocket(`ws://${top.location.host}`);
+            if (!navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+                root.innerHTML += 'No media devices found on this device :(';
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    const recorder = new MediaRecorder(stream);
+                    recorder.ondataavailable = event => {
+                        const blob = event.data;
+                        console.log(blob);
+                        const fr = new FileReader();
+                        fr.readAsArrayBuffer(blob);
+                        fr.onloadend = e => ws.send(fr.result);
+                    };
+                    recorder.start(1000);
+                    //audio.srcObject = stream;
+                });
+        </script>
+    </body>
+</html>
