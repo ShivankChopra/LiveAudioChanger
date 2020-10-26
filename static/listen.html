@@ -1,0 +1,31 @@
+<html>
+<head>
+    <title>Live Streaming Voice Changer</title>
+</head>
+
+<body>
+    Listen to the live stream
+    <div id="root" />
+    <audio></audio>
+    <script>
+        let root = document.getElementById('root');
+        let audio = document.querySelector('audio');
+        let ws = new WebSocket(`ws://${top.location.host}/listenAudio`);
+        let mediaSource = new MediaSource();
+        audio.src = URL.createObjectURL(mediaSource);
+        mediaSource.addEventListener('sourceopen', sourceOpen);
+        function sourceOpen(_) {
+            let mediaSource = this;
+            let sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs=vp8');
+            ws.onmessage = function (event) {
+                let buf = event.data;
+                sourceBuffer.addEventListener('updateend', function (_) {
+                    mediaSource.endOfStream();
+                    audio.play();
+                });
+                sourceBuffer.appendBuffer(buf);
+            }
+        };
+    </script>
+</body>
+</html>
