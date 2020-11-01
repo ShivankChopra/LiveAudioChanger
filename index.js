@@ -1,19 +1,6 @@
 const { createServer } = require('http');
 const fs = require('fs');
-const { createHash } = require('crypto');
-
-const WS_MAGIC_STRING = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
-
-function doWsHandshake(socket, headers) {
-    let sha1 = createHash('sha1');
-    sha1.update(`${headers['sec-websocket-key']}${WS_MAGIC_STRING}`);
-    const secWebsocketAccept = sha1.digest().toString('base64');
-    socket.write('HTTP/1.1 101 Web Socket Protocol Handshake\r\n' +
-        'Upgrade: WebSocket\r\n' +
-        'Connection: Upgrade\r\n' +
-        `Sec-WebSocket-Accept: ${secWebsocketAccept}\r\n` +
-        '\r\n');
-}
+const { doWsHandshake } = require('./websocketHelpers');
 
 const server = createServer((req, res) => {
     try {
