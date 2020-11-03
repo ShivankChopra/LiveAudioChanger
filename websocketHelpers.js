@@ -1,7 +1,7 @@
 const { createHash } = require('crypto');
 const { Transform } = require('stream');
 
-const WS_MAGIC_STRING = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
+
 
 function parsePacketHeaders(buffer) {
     let offset = 0; // in bytes
@@ -14,7 +14,7 @@ function parsePacketHeaders(buffer) {
 
     const secondByte = buffer.readInt8(offset);
     const isMasked = (secondByte >>> 7) & 0x1;
-    const payloadLength = secondByte & 0x7f; // 1111111
+    let payloadLength = secondByte & 0x7f; // 1111111
     offset += 1;
 
     if (payloadLength === 126) { // need to read from 2 bytes
@@ -25,27 +25,30 @@ function parsePacketHeaders(buffer) {
         offset += 8;
     }
 
-    let packetPayload;
-    if (isMasked == 1) { // unmask the payload
-        const maskingKey = buffer.readUInt32BE(offset);
-        const maskingKeyArr = [
-            (maskingKey >>> 3) & 0x1,
-            (maskingKey >>> 2) & 0x1,
-            (maskingKey >>> 1) & 0x1,
-            maskingKey & 0x1
-        ];
-        packetPayload = buffer.subarray(offset + 4, buffer.length);
-        for (let i = 0; i < packetPayload.length; i++) {
-            packetPayload[i] = packetPayload[i] ^ maskingKeyArr[i % 4];
-        }
-    } else {
-        packetPayload = buffer.subarray(offset, buffer.length);
-    }
-
-    return { isFinalFrame, rsrv1, rsrv2, rsrv3, opCode, payloadLength, payload: packetPayload };
+    return { isFinalFrame, rsrv1, rsrv2, rsrv3, opCode, isMasked, payloadLength, offset };
 }
 
-const doWsHandshake = (socket, headers) => {
+
+
+function getUnmaskedPayload(buffer) {
+    const maskingKey = buffer.readUInt32BE(0);
+    const maskingKeyArr = [
+        (maskingKey >>> 8 * 3) & 0xf,
+        (maskingKey >>> 8 * 2) & 0xf,
+        (maskingKey >>> 8 * 1) & 0xf,
+        maskingKey & 0xf
+    ];
+    let decoded = buffer.subarray(4, buffer.length - 1);
+    for (let i = 0; i < decoded.byteLength; i++) {
+        decoded[i] = decoded[i] ^ maskingKeyArr[i % 4];
+    }
+    return decoded;
+}
+
+
+
+function doWsHandshake(socket, headers) {
+    const WS_MAGIC_STRING = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
     let sha1 = createHash('sha1');
     sha1.update(`${headers['sec-websocket-key']}${WS_MAGIC_STRING}`);
     const secWebsocketAccept = sha1.digest().toString('base64');
@@ -56,13 +59,20 @@ const doWsHandshake = (socket, headers) => {
         '\r\n');
 }
 
+
+
 let frameParseStream, makeWsPacketStream;
 
-// Assemble valid websocket frames
+
+
+/* 
+    Assemble valid websocket frames 
+*/
 let assembleStream = new Transform({});
 assembleStream.remChunk = null; // track leftover buffer chunks
 assembleStream._transform = function (buffer, encoding, cb) {
-    let pl, buffSize, aggrBuffer;
+    // get total buffer to process
+    let buffSize, aggrBuffer;
     if (!!this.remChunk) {
         aggrBuffer = Buffer.concat([this.remChunk, buffer]);
     } else {
@@ -70,20 +80,23 @@ assembleStream._transform = function (buffer, encoding, cb) {
     }
     buffSize = aggrBuffer.length;
 
-    // TODO: read payload length
+    // get expected packet length
+    const { payloadLength : pl, offset : headerLength } = parsePacketHeaders(aggrBuffer); 
 
-
-    if (buffSize < pl) {
+    // manage remaining chunks and push complete packet
+    if (buffSize - headerLength < pl) {
         this.remChunk = aggrBuffer;
-    } else if (buffSize == pl) {
+    } else if (buffSize - headerLength == pl) {
         this.push(aggrBuffer);
         this.remChunk = null;
         cb();
-    } else if (buffSize > pl) {
+    } else if (buffSize - headerLength > pl) {
         this.remChunk = aggrBuffer.slice(pl, buffSize);
         this.push(aggrBuffer.slice(0, pl - 1));
         cb();
     }
 }
+
+
 
 module.exports = { doWsHandshake, assembleStream, frameParseStream, makeWsPacketStream };

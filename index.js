@@ -1,6 +1,8 @@
 const { createServer } = require('http');
 const fs = require('fs');
-const { doWsHandshake } = require('./websocketHelpers');
+const { doWsHandshake, assembleStream } = require('./websocketHelpers');
+
+
 
 const server = createServer((req, res) => {
     try {
@@ -19,7 +21,11 @@ const server = createServer((req, res) => {
     }
 });
 
+
+
 let feedSocket = null, listenSocket = null;
+
+
 
 // web socket 
 server.on('upgrade', (req, socket, head) => {
@@ -28,7 +34,8 @@ server.on('upgrade', (req, socket, head) => {
         if (url == '/feedAudio') {
             doWsHandshake(socket, headers);
             feedSocket = socket;
-            if (!!listenSocket) feedSocket.pipe(listenSocket);
+            feedSocket.pipe(assembleStream).pipe(process.stdout);
+            //if (!!listenSocket) feedSocket.pipe(listenSocket);
         } else if (url == '/listenAudio') {
             doWsHandshake(socket, headers);
             listenSocket = socket;
@@ -39,7 +46,11 @@ server.on('upgrade', (req, socket, head) => {
     }
 });
 
+
+
 server.listen(3000, '127.0.0.1', () => console.log('Server listening on port 3000'));
+
+
 
 process.on('unhandledRejection', err => console.log(err));
 process.on('uncaughtException', err => console.log(err));
