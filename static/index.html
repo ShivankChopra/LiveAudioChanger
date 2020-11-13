@@ -1,27 +1,31 @@
 <html>
-    <head>
-        <title>Live Streaming Voice Changer</title>
-    </head>
 
-    <body>
-        Live Streaming Voice Changer
-        <div id="root" />
-        <script>
-            let root = document.getElementById('root');
-            let ws = new WebSocket(`ws://${top.location.host}/feedAudio`);
-            if (!navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
-                root.innerHTML += 'No media devices found on this device :(';
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp8'});
-                    recorder.ondataavailable = event => {
-                        const blob = event.data;
-                        const fr = new FileReader();
-                        fr.readAsArrayBuffer(blob);
-                        fr.onloadend = e => ws.send(fr.result);
-                    };
-                    recorder.start(1000);
-                });
-        </script>
-    </body>
+<head>
+    <title>Live Streaming Voice Changer</title>
+</head>
+
+<body>
+    Live Streaming Voice Changer
+    <div id="root" />
+    <script>
+        let root = document.getElementById('root');
+        let ws = new WebSocket(`ws://${top.location.host}/feedAudio`);
+        // setInterval(() => ws.send('Hello World! Listen to my audio!'), 1000);
+
+        if (!navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+            root.innerHTML += 'No media devices found on this device :(';
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=opus' });
+                recorder.ondataavailable = event => {
+                    const blob = event.data;
+                    const fr = new FileReader();
+                    fr.readAsArrayBuffer(blob);
+                    fr.onloadend = e => ws.send(fr.result);
+                };
+                recorder.start(2000);
+            });
+    </script>
+</body>
+
 </html>

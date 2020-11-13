@@ -1,4 +1,5 @@
 <html>
+
 <head>
     <title>Live Streaming Voice Changer</title>
 </head>
@@ -6,26 +7,47 @@
 <body>
     Listen to the live stream
     <div id="root" />
-    <audio></audio>
+    <audio controls></audio>
     <script>
         let root = document.getElementById('root');
         let audio = document.querySelector('audio');
+
         let ws = new WebSocket(`ws://${top.location.host}/listenAudio`);
+        ws.binaryType = 'arraybuffer';
+        ws.onerror = function (error) {
+            console.log(error);
+        }
+        ws.onopen = function () {
+            console.log('Connection opened!');
+        }
+        ws.onclose = function () {
+            console.log('Websocoket connection close')
+        }
+
         let mediaSource = new MediaSource();
         audio.src = URL.createObjectURL(mediaSource);
         mediaSource.addEventListener('sourceopen', sourceOpen);
+
+
+        let cache = [], flag = true;
         function sourceOpen(_) {
-            let mediaSource = this;
-            let sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs=vp8');
+            let ms = this;
+            ms.onerror = er => console.log(er);
+            ms.onclose = () => console.log('Media source closed');
+
+            let sourceBuffer = ms.addSourceBuffer('video/webm; codecs=opus');
+            sourceBuffer.updateend = function () {
+                audio.play();
+            }
             ws.onmessage = function (event) {
-                let buf = event.data;
-                sourceBuffer.addEventListener('updateend', function (_) {
-                    mediaSource.endOfStream();
-                    audio.play();
-                });
-                sourceBuffer.appendBuffer(buf);
+                try {
+                    sourceBuffer.appendBuffer(event.data);
+                } catch (e) {
+                    console.log(audio.error);
+                }
             }
         };
     </script>
 </body>
+
 </html>
