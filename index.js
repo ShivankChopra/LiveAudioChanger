@@ -1,6 +1,6 @@
 const { createServer } = require('http');
 const fs = require('fs');
-const { doWsHandshake, assembleStream } = require('./websocketHelpers');
+const { doWsHandshake, assembleStream, frameParseStream, makeWsPacketStream } = require('./websocketHelpers');
 
 
 
@@ -34,12 +34,22 @@ server.on('upgrade', (req, socket, head) => {
         if (url == '/feedAudio') {
             doWsHandshake(socket, headers);
             feedSocket = socket;
-            feedSocket.pipe(assembleStream).pipe(process.stdout);
+            // feedSocket
+            //     .pipe(assembleStream)
+            //     .pipe(frameParseStream)
+            //     // .pipe(fs.createWriteStream('./clientDump.webm'))
+            //     .pipe(makeWsPacketStream);
             //if (!!listenSocket) feedSocket.pipe(listenSocket);
         } else if (url == '/listenAudio') {
             doWsHandshake(socket, headers);
             listenSocket = socket;
-            //if (!!feedSocket) feedSocket.pipe(listenSocket);
+            if (!!feedSocket) {
+                feedSocket
+                    .pipe(assembleStream)
+                    .pipe(frameParseStream)
+                    .pipe(makeWsPacketStream)
+                    .pipe(listenSocket);
+            }
         }
     } catch (err) {
         console.log(err);
@@ -48,7 +58,7 @@ server.on('upgrade', (req, socket, head) => {
 
 
 
-server.listen(3000, '127.0.0.1', () => console.log('Server listening on port 3000'));
+server.listen(3000, '0.0.0.0', () => console.log('Server listening on port 3000'));
 
 
 
